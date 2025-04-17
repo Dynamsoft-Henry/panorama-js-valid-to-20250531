@@ -247,7 +247,7 @@ const dps_stitchImage = async(dpsInstanceID, camera, resultCtx, videoOverlayCtx 
           }
         }
 
-        if(videoOverlayCtx && ret.frameMappedResult){
+        if(videoOverlayCtx && ret.frameMappedResult?.landmarksArray){
           videoOverlayCtx.clearRect(0, 0, videoOverlayCtx.canvas.width, videoOverlayCtx.canvas.height);
           videoOverlayCtx.fillStyle = 'rgba(0,255,0,0.5)';
           videoOverlayCtx.strokeStyle = 'rgba(0,255,0,1)';
