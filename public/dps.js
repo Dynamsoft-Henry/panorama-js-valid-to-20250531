@@ -67,7 +67,7 @@ document.getElementById('btn-start').addEventListener('click', async()=>{
       spBarcodeCount.innerText = landmarksArray.length;
       document.title = `${ret.timeCost}/${Date.now() - timeStart}ms`;
       
-      if(!cbSavePower.checked){ await new Promise(r=>setTimeout(r, 100)); }
+      if(cbSavePower.checked){ await new Promise(r=>setTimeout(r, 100)); }
     }
     if('paused' !== camera.status && drawedVideoOverlay){
       videoOverlayCtx.clearRect(0, 0, videoOverlayCtx.canvas.width, videoOverlayCtx.canvas.height);
