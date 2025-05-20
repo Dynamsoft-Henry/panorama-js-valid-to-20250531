@@ -1,19 +1,22 @@
 
 
 const camera = new DMCamera.Camera();
-Object.assign(camera._coreWrapper.style, {
+Object.assign(camera.ui.style, {
   width: '50%',
   height: '45%',
   position: 'absolute',
   top: '0px',
   right: '0px',
 });
-document.body.append(camera._coreWrapper);
+document.body.append(camera.ui);
+camera.shouldCloseWhenHide = false; // don't close video when windows is hidden
+camera.requestResolution(3840,1280); // 4K
 
 const divConfig = document.getElementById('div-config')
 const cbIndicateBarcodeOnVideo = document.getElementById('cb-indicate-barcode-on-video');
 const cbMoreVideoArea = document.getElementById('cb-more-video-area');
 const cbSavePower = document.getElementById('cb-savepower');
+const selResolution = document.getElementById('sel-resolution');
 const selTemplate = document.getElementById('sel-template');
 const spBarcodeCount = document.getElementById('sp-barcode-count');
 const btnCopyTxt = document.getElementById('btn-copy-txt');
@@ -124,6 +127,10 @@ cbMoreVideoArea.addEventListener('change', ()=>{
     resultCtx.canvas.style.height = '50svh';
   }
 });
+
+selResolution.addEventListener('change', async()=>{
+  camera.requestResolution(selResolution.value.split(','));
+})
 
 selTemplate.addEventListener('change', async()=>{
   await pInit;
