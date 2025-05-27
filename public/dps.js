@@ -10,7 +10,6 @@ Object.assign(camera.ui.style, {
 });
 document.body.append(camera.ui);
 camera.shouldCloseWhenHide = false; // don't close video when windows is hidden
-camera.requestResolution(3840,1280); // 4K
 
 const divConfig = document.getElementById('div-config')
 const cbIndicateBarcodeOnVideo = document.getElementById('cb-indicate-barcode-on-video');
@@ -24,8 +23,9 @@ const btnCopyTxt = document.getElementById('btn-copy-txt');
 const videoOverlayCtx = camera.addCanvas().getContext('2d');
 const resultCtx = document.getElementById('cvs-result').getContext('2d');
 
-//Dynamsoft.Core.CoreModule._bDebug = true;
-Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets/';
+// change assets name to disable cache
+Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-05-27/';
+console.log(Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory);
 
 let dpsInstanceID;
 const pInit = (async()=>{
@@ -34,7 +34,7 @@ const pInit = (async()=>{
 
   dpsInstanceID = await dps_createInstance();
   console.log(await dps_initCVRSettings(dpsInstanceID, await fetch(selTemplate.value).then(r=>r.text())));
-  console.log(await dps_initSettings(dpsInstanceID, await fetch('template_panorama.json').then(r=>r.text())));
+  console.log(await dps_initSettings(dpsInstanceID, await fetch('template_panorama.json?v=20240427').then(r=>r.text())));
   // call `await dps_deleteInstance(dpsInstanceID)` to destroy the instance and release memory.
 })();
 
@@ -45,6 +45,7 @@ document.getElementById('btn-start').addEventListener('click', async()=>{
   if('closed' === camera.status || 'paused' === camera.status){
     // start
     await pInit;
+    await camera.requestResolution(selResolution.value.split(','));
     await camera.open();
     while('opened' === camera.status){
       const timeStart = Date.now();
@@ -65,9 +66,12 @@ document.getElementById('btn-start').addEventListener('click', async()=>{
         alert('Looks like there is an error, you need to refresh the page. Details: '+ex?.message);
         throw ex;
       }
-      
-      landmarksArray = ret.capturedPanoramaArray[0].landmarksArray;
-      spBarcodeCount.innerText = landmarksArray.length;
+
+      const capturedPanorama = ret.capturedPanoramaArray[0];
+      if(capturedPanorama.landmarksArray){
+        landmarksArray = capturedPanorama.landmarksArray;
+        spBarcodeCount.innerText = landmarksArray.length;
+      }
       document.title = `${ret.timeCost}/${Date.now() - timeStart}ms`;
       
       if(cbSavePower.checked){ await new Promise(r=>setTimeout(r, 100)); }
@@ -110,7 +114,7 @@ document.getElementById('btn-save').addEventListener('click', async()=>{
 
 cbMoreVideoArea.addEventListener('change', ()=>{
   if(cbMoreVideoArea.checked){
-    Object.assign(camera._coreWrapper.style, {
+    Object.assign(camera.ui.style, {
       width: '100%',
       height: '70%',
       zIndex: '-1',
@@ -118,7 +122,7 @@ cbMoreVideoArea.addEventListener('change', ()=>{
     divConfig.style.height = '70svh';
     resultCtx.canvas.style.height = '25svh';
   }else{
-    Object.assign(camera._coreWrapper.style, {
+    Object.assign(camera.ui.style, {
       width: '50%',
       height: '45%',
       zIndex: undefined,
@@ -190,7 +194,7 @@ const dps_initCVRSettings = async(dpsInstanceID, cvrSettings)=>{
 };
 const dps_initSettings = async(dpsInstanceID, settings)=>{
   let settingsObj = JSON.parse(settings);
-  settingsObj.PanoramaSettings[0].ThreadMode = 0;
+  settingsObj.BatchScanTemplates[0].ThreadManagementMode = 0;
   settings = JSON.stringify(settingsObj);
   let taskID = Dynamsoft.Core.getNextTaskID();
   return await new Promise(async(rs,rj)=>{
@@ -219,12 +223,39 @@ const dps_stitchImage = async(dpsInstanceID, camera, resultCtx, videoOverlayCtx 
   if(!u8.length){console.log('no image');return;}
   let taskID = Dynamsoft.Core.getNextTaskID();
   return await new Promise((rs,rj)=>{
-    Dynamsoft.Core.mapTaskCallBack[taskID] = (body) => {
+    Dynamsoft.Core.mapTaskCallBack[taskID] = async(body) => {
+
+      //// kdebug: collect image
+      // {
+      //   let cvs = frameCvs;
+      //   let fd = new FormData();
+      //   if (cvs != null) {
+      //     let blob = cvs.convertToBlob
+      //       ? await cvs.convertToBlob()
+      //       : await new Promise((resolve) => {
+      //         cvs.toBlob((blob) => resolve(blob));
+      //       });
+      //     fd.append("img", blob);
+      //     await fetch("https://localhost:4443/collect", {
+      //       method: "POST",
+      //       body: fd,
+      //     });
+      //   }
+      // }
+
       if (body.success) {
         const ret = body.response;
         const capturedPanorama = ret.capturedPanoramaArray[0];
         const image = capturedPanorama.image;
         const resultCvs = resultCtx.canvas;
+        if(capturedPanorama.errorCode){
+          console.warn(`errorCode: ${capturedPanorama.errorCode}, errorMessage: ${capturedPanorama.errorString}`);
+          let errorString = capturedPanorama.errorString;
+          if(capturedPanorama.errorCode <= -20000 && capturedPanorama.errorCode > -30000){
+            errorString = errorString || 'License Error';
+          }
+          throw(Error(errorString));
+        }
         if(image){
           if(resultCvs.width !== image.width){ resultCvs.width = image.width; }
           if(resultCvs.height !== image.height){ resultCvs.height = image.height; }
