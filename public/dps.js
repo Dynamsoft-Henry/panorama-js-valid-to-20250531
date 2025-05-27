@@ -23,6 +23,7 @@ const btnCopyTxt = document.getElementById('btn-copy-txt');
 const videoOverlayCtx = camera.addCanvas().getContext('2d');
 const resultCtx = document.getElementById('cvs-result').getContext('2d');
 
+//Dynamsoft.Core.CoreModule._bDebug = true;
 // change assets name to disable cache
 Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-05-27/';
 console.log(Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory);
@@ -34,7 +35,7 @@ const pInit = (async()=>{
 
   dpsInstanceID = await dps_createInstance();
   console.log(await dps_initCVRSettings(dpsInstanceID, await fetch(selTemplate.value).then(r=>r.text())));
-  console.log(await dps_initSettings(dpsInstanceID, await fetch('template_panorama.json?v=20240427').then(r=>r.text())));
+  console.log(await dps_initSettings(dpsInstanceID, await fetch('template_panorama.json?v=20240527').then(r=>r.text())));
   // call `await dps_deleteInstance(dpsInstanceID)` to destroy the instance and release memory.
 })();
 
