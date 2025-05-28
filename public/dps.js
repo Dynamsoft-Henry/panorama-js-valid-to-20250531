@@ -25,7 +25,7 @@ const resultCtx = document.getElementById('cvs-result').getContext('2d');
 
 //Dynamsoft.Core.CoreModule._bDebug = true;
 // change assets name to disable cache
-Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-05-27/';
+Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-05-28/';
 console.log(Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory);
 
 let dpsInstanceID;
@@ -34,8 +34,8 @@ const pInit = (async()=>{
   await Dynamsoft.Core.CoreModule.loadWasm(["DBR"]);
 
   dpsInstanceID = await dps_createInstance();
-  console.log(await dps_initCVRSettings(dpsInstanceID, await fetch(selTemplate.value).then(r=>r.text())));
-  console.log(await dps_initSettings(dpsInstanceID, await fetch('template_panorama.json?v=20240527').then(r=>r.text())));
+  await funcUpdateCvrSettings();
+  await funcUpdatePanoramaSettings();
   // call `await dps_deleteInstance(dpsInstanceID)` to destroy the instance and release memory.
 })();
 
@@ -143,12 +143,14 @@ cbMoreVideoArea.addEventListener('change', ()=>{
 });
 
 selResolution.addEventListener('change', async()=>{
-  camera.requestResolution(selResolution.value.split(','));
+  await camera.requestResolution(selResolution.value.split(',').map(parseInt));
+  await funcUpdateCvrSettings();
+  await funcUpdatePanoramaSettings();
 })
 
 selTemplate.addEventListener('change', async()=>{
   await pInit;
-  await dps_initCVRSettings(dpsInstanceID, await fetch(selTemplate.value).then(r=>r.text()));
+  await funcUpdateCvrSettings();
 })
 
 btnCopyTxt.addEventListener('click', ()=>{
@@ -161,6 +163,20 @@ btnCopyTxt.addEventListener('click', ()=>{
 
 // Helper code. You don't need to care about the following implementation details.
 
+const funcUpdateCvrSettings = async()=>{
+  let tpl = await fetch(selTemplate.value).then(r=>r.text());
+  if(parseInt(selResolution.value.split(',')[0]) > 1920){
+    tpl = tpl.replace(',{"Mode":"LM_LINES"}', ''); // speed up ligh resolution
+  }
+  await dps_initCVRSettings(dpsInstanceID, tpl);
+}
+const funcUpdatePanoramaSettings = async()=>{
+  let tpl = await fetch('template_panorama.json?v=20240528').then(r=>r.text());
+  if(parseInt(selResolution.value.split(',')[0]) > 1920){
+    tpl = tpl.replace('"PanoramicImageScalePercent": 50,', '"PanoramicImageScalePercent": 25,'); // speed up ligh resolution
+  }
+  await dps_initSettings(dpsInstanceID, tpl);
+}
 const dps_createInstance = async()=>{
   let taskID = Dynamsoft.Core.getNextTaskID();
   return await new Promise((rs,rj)=>{

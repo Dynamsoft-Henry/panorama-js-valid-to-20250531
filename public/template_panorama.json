@@ -2,6 +2,8 @@
   "BatchScanTemplates": [
     {
       "Name": "BST_Default",
+      "PanoramicImageScalePercent": 50,
+      "MemoryKeepLevel": 3,
       "CaptureVisionTemplateName": "CVT_Default"
     }
   ]
