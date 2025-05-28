@@ -55,11 +55,12 @@ document.getElementById('btn-start').addEventListener('click', async()=>{
         if(cbIndicateBarcodeOnVideo.checked){
           ret = await dps_stitchImage(dpsInstanceID, camera, resultCtx, videoOverlayCtx);
           drawedVideoOverlay = true;
-        }else{
-          if(drawedVideoOverlay){
+          // double check
+          if(!cbIndicateBarcodeOnVideo.checked || 'opened' !== camera.status){
             videoOverlayCtx.clearRect(0, 0, videoOverlayCtx.canvas.width, videoOverlayCtx.canvas.height);
             drawedVideoOverlay = false;
           }
+        }else{
           ret = await dps_stitchImage(dpsInstanceID, camera, resultCtx);
         }
       }catch(ex){
@@ -77,9 +78,6 @@ document.getElementById('btn-start').addEventListener('click', async()=>{
       
       if(cbSavePower.checked){ await new Promise(r=>setTimeout(r, 100)); }
     }
-    if('paused' !== camera.status && drawedVideoOverlay){
-      videoOverlayCtx.clearRect(0, 0, videoOverlayCtx.canvas.width, videoOverlayCtx.canvas.height);
-    }
   }else if('opened' === camera.status){
     // pause
     camera.pause();
@@ -88,6 +86,10 @@ document.getElementById('btn-start').addEventListener('click', async()=>{
 
 document.getElementById('btn-stop').addEventListener('click', async()=>{
   camera.close();
+  if(drawedVideoOverlay){
+    videoOverlayCtx.clearRect(0, 0, videoOverlayCtx.canvas.width, videoOverlayCtx.canvas.height);
+    drawedVideoOverlay = false;
+  }
   if(dpsInstanceID){ await dps_clean(dpsInstanceID); }
 });
 
@@ -111,6 +113,13 @@ document.getElementById('btn-save').addEventListener('click', async()=>{
   );
   document.body.removeChild(link);
   
+});
+
+cbIndicateBarcodeOnVideo.addEventListener('change', ()=>{
+  if(!cbIndicateBarcodeOnVideo.checked && drawedVideoOverlay){
+    videoOverlayCtx.clearRect(0, 0, videoOverlayCtx.canvas.width, videoOverlayCtx.canvas.height);
+    drawedVideoOverlay = false;
+  }
 });
 
 cbMoreVideoArea.addEventListener('change', ()=>{
