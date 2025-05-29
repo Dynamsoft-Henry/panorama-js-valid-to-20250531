@@ -1,4 +1,4 @@
-It's a pure browser js solution.
+It's a pure browser js solution. 
 
 We use node.js only to provide https services, you can use any other web servers like Nginx, IIS, Apache.
 
