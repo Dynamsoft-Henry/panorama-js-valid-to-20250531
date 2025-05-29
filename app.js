@@ -1,9 +1,35 @@
 const express = require('express');
 const fs = require('fs');
 const https = require('https');
+const cors = require('cors');
+const util = require('util');
 const path = require('path');
+const multer = require('multer');
 
 const app = express();
+// Access-Control-Allow-Origin: **any**
+app.use(cors({
+    origin: (origin, callback) => {
+        return callback(null, true);
+    }
+}));
+
+// collect images
+const dirCollect = path.join(__dirname, 'public/collect');
+if(!fs.existsSync(dirCollect)){
+    fs.mkdirSync(dirCollect);
+}
+const collect = multer({ storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, dirCollect);
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now()+'.png');
+    }
+}) });//dest: path.join(__dirname, 'public/collect')
+app.post('/collect', collect.any(), async(req, res) => {
+    res.send(util.inspect(req.files,{depth:null}));
+});
 
 // static files
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -18,12 +44,17 @@ app.use(express.static(path.join(__dirname, 'public'), {
                         https://slts.dynamsoft.com/\
                         https://mdls.dynamsoftonline.com/\
                         https://sdls.dynamsoftonline.com/; \
-            script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/ blob:; \
+            script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/ blob: 'unsafe-inline'; \
             media-src 'self' data:;\
-            img-src 'self' data: blob:;\
+            img-src 'self' data: blob: https://opencollective.com/eruda/backers.svg;\
             style-src-attr 'self' 'unsafe-inline';\
             style-src 'self' 'unsafe-inline';\
+            font-src 'self' data:;\
         ")
+        // === Only for eruda ===
+        // font-src
+        // script-src 'unsafe-inline'
+        // https://opencollective.com/eruda/backers.svg
     }
 }));
 

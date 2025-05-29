@@ -19,13 +19,14 @@ const selResolution = document.getElementById('sel-resolution');
 const selTemplate = document.getElementById('sel-template');
 const spBarcodeCount = document.getElementById('sp-barcode-count');
 const btnCopyTxt = document.getElementById('btn-copy-txt');
+const preDebug = document.getElementById('pre-debug');
 
 const videoOverlayCtx = camera.addCanvas().getContext('2d');
 const resultCtx = document.getElementById('cvs-result').getContext('2d');
 
 //Dynamsoft.Core.CoreModule._bDebug = true;
 // change assets name to disable cache
-Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-05-28/';
+Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-05-29/';
 console.log(Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory);
 
 let dpsInstanceID;
@@ -42,12 +43,15 @@ const pInit = (async()=>{
 
 let drawedVideoOverlay = false;
 let landmarksArray = [];
+let frameCount = 0;
+let resultImageCount = 0;
 document.getElementById('btn-start').addEventListener('click', async()=>{
   if('closed' === camera.status || 'paused' === camera.status){
     // start
     await pInit;
-    await camera.requestResolution(selResolution.value.split(','));
+    await camera.requestResolution(selResolution.value.split(',').map(parseInt));
     await camera.open();
+    frameCount = resultImageCount = 0;
     while('opened' === camera.status){
       const timeStart = Date.now();
       let ret;
@@ -56,7 +60,7 @@ document.getElementById('btn-start').addEventListener('click', async()=>{
           ret = await dps_stitchImage(dpsInstanceID, camera, resultCtx, videoOverlayCtx);
           drawedVideoOverlay = true;
           // double check
-          if(!cbIndicateBarcodeOnVideo.checked || 'opened' !== camera.status){
+          if(!cbIndicateBarcodeOnVideo.checked || 'opened' !== camera.status && 'paused' !== camera.status){
             videoOverlayCtx.clearRect(0, 0, videoOverlayCtx.canvas.width, videoOverlayCtx.canvas.height);
             drawedVideoOverlay = false;
           }
@@ -69,12 +73,20 @@ document.getElementById('btn-start').addEventListener('click', async()=>{
         throw ex;
       }
 
+      ++frameCount;
       const capturedPanorama = ret.capturedPanoramaArray[0];
       if(capturedPanorama.landmarksArray){
         landmarksArray = capturedPanorama.landmarksArray;
         spBarcodeCount.innerText = landmarksArray.length;
+        ++resultImageCount;
       }
-      document.title = `${ret.timeCost}/${Date.now() - timeStart}ms`;
+      preDebug.textContent = [
+        `${frameCount} frame(s)`,
+        `${resultImageCount} result image(s)`,
+        `algorithm ${ret.timeCost}ms`,
+        `total ${Date.now() - timeStart}ms`,
+        `memory ${(ret.memory/1024/1024).toFixed(1)}MB`
+      ].join('\n');
       
       if(cbSavePower.checked){ await new Promise(r=>setTimeout(r, 100)); }
     }
@@ -251,8 +263,8 @@ const dps_stitchImage = async(dpsInstanceID, camera, resultCtx, videoOverlayCtx 
   return await new Promise((rs,rj)=>{
     Dynamsoft.Core.mapTaskCallBack[taskID] = async(body) => {
 
-      //// kdebug: collect image
-      // {
+      // // kdebug: collect image
+      // try{
       //   let cvs = frameCvs;
       //   let fd = new FormData();
       //   if (cvs != null) {
@@ -262,12 +274,12 @@ const dps_stitchImage = async(dpsInstanceID, camera, resultCtx, videoOverlayCtx 
       //         cvs.toBlob((blob) => resolve(blob));
       //       });
       //     fd.append("img", blob);
-      //     await fetch("https://localhost:4443/collect", {
+      //     await fetch("collect", {
       //       method: "POST",
       //       body: fd,
       //     });
       //   }
-      // }
+      // }catch(ex){console.log(ex);}
 
       if (body.success) {
         const ret = body.response;
