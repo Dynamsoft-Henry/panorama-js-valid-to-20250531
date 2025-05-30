@@ -26,7 +26,7 @@ const resultCtx = document.getElementById('cvs-result').getContext('2d');
 
 //Dynamsoft.Core.CoreModule._bDebug = true;
 // change assets name to disable cache
-Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-05-29/';
+Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-05-30/';
 console.log(Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory);
 
 let dpsInstanceID;
@@ -263,23 +263,25 @@ const dps_stitchImage = async(dpsInstanceID, camera, resultCtx, videoOverlayCtx 
   return await new Promise((rs,rj)=>{
     Dynamsoft.Core.mapTaskCallBack[taskID] = async(body) => {
 
-      // // kdebug: collect image
-      // try{
-      //   let cvs = frameCvs;
-      //   let fd = new FormData();
-      //   if (cvs != null) {
-      //     let blob = cvs.convertToBlob
-      //       ? await cvs.convertToBlob()
-      //       : await new Promise((resolve) => {
-      //         cvs.toBlob((blob) => resolve(blob));
-      //       });
-      //     fd.append("img", blob);
-      //     await fetch("collect", {
-      //       method: "POST",
-      //       body: fd,
-      //     });
-      //   }
-      // }catch(ex){console.log(ex);}
+      // kdebug: collect image
+      if(document.querySelector('#cb-upload-frame').checked){
+        try{
+          let cvs = frameCvs;
+          let fd = new FormData();
+          if (cvs != null) {
+            let blob = cvs.convertToBlob
+              ? await cvs.convertToBlob()
+              : await new Promise((resolve) => {
+                cvs.toBlob((blob) => resolve(blob));
+              });
+            fd.append("img", blob);
+            await fetch("collect", {
+              method: "POST",
+              body: fd,
+            });
+          }
+        }catch(ex){console.log(ex);}
+      }
 
       if (body.success) {
         const ret = body.response;
