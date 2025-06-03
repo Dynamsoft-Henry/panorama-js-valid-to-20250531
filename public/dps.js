@@ -80,7 +80,10 @@ document.getElementById('btn-start').addEventListener('click', async()=>{
         spBarcodeCount.innerText = landmarksArray.length;
         ++resultImageCount;
       }
+      // kDebug
+      const rsl = camera.currentResolution;
       preDebug.textContent = [
+        `${rsl.width}x${rsl.height}`,
         `${frameCount} frame(s)`,
         `${resultImageCount} result image(s)`,
         `algorithm ${ret.timeCost}ms`,
