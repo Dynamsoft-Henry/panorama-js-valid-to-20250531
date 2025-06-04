@@ -26,7 +26,7 @@ const resultCtx = document.getElementById('cvs-result').getContext('2d');
 
 //Dynamsoft.Core.CoreModule._bDebug = true;
 // change assets name to disable cache
-Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-05-30/';
+Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-06-04/';
 console.log(Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory);
 
 let dpsInstanceID;
