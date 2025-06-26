@@ -1,5 +1,4 @@
 
-
 const camera = new DMCamera.Camera();
 Object.assign(camera.ui.style, {
   width: '50%',
@@ -26,7 +25,7 @@ const resultCtx = document.getElementById('cvs-result').getContext('2d');
 
 //Dynamsoft.Core.CoreModule._bDebug = true;
 // change assets name to disable cache
-Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-06-20/';
+Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-06-26/';
 console.log(Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory);
 
 let dpsInstanceID;
