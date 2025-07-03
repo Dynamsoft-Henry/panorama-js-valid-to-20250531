@@ -26,7 +26,7 @@ const resultCtx = document.getElementById('cvs-result').getContext('2d');
 
 //Dynamsoft.Core.CoreModule._bDebug = true;
 // change assets name to disable cache
-Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-06-27/';
+Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-07-03/';
 console.log(Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory);
 
 let dpsInstanceID;
@@ -74,8 +74,8 @@ document.getElementById('btn-start').addEventListener('click', async()=>{
       }
 
       ++frameCount;
-      const capturedPanorama = ret.capturedPanoramaArray[0];
-      if(capturedPanorama.landmarksArray){
+      const capturedPanorama = ret?.capturedPanoramaArray?.[0];
+      if(capturedPanorama?.landmarksArray){
         landmarksArray = capturedPanorama.landmarksArray;
         spBarcodeCount.innerText = landmarksArray.length;
         ++resultImageCount;
@@ -86,9 +86,9 @@ document.getElementById('btn-start').addEventListener('click', async()=>{
         `${rsl.width}x${rsl.height}`,
         `${frameCount} frame(s)`,
         `${resultImageCount} result image(s)`,
-        `algorithm ${ret.timeCost}ms`,
+        `algorithm ${ret?.timeCost}ms`,
         `total ${Date.now() - timeStart}ms`,
-        `memory ${(ret.memory/1024/1024).toFixed(1)}MB`
+        `memory ${(ret?.memory/1024/1024).toFixed(1)}MB`
       ].join('\n');
       
       if(cbSavePower.checked){ await new Promise(r=>setTimeout(r, 100)); }
@@ -104,6 +104,37 @@ document.getElementById('btn-stop').addEventListener('click', async()=>{
   if(drawedVideoOverlay){
     videoOverlayCtx.clearRect(0, 0, videoOverlayCtx.canvas.width, videoOverlayCtx.canvas.height);
     drawedVideoOverlay = false;
+  }
+  // TODO: double click protection
+  if(frameCount > 2){
+    let taskID = Dynamsoft.Core.getNextTaskID();
+    return await new Promise((rs,rj)=>{
+      Dynamsoft.Core.mapTaskCallBack[taskID] = async(body) => {
+
+        if (body.success) {
+          const ret = body.response;
+          handleResult(ret, resultCtx, videoOverlayCtx);
+          rs();
+        } else {
+          const err = Error(body.message);
+          if (body.stack) { err.stack = body.stack; }
+          rj(err);
+        }
+      }
+      Dynamsoft.Core.worker.postMessage({
+        type: 'dps_setPanoramicBaseImage',
+        instanceID: dpsInstanceID,
+        body: {
+          bytes: new Uint8Array(0),
+          width: 0,
+          height: 0,
+          stride: 0,
+          format: 10,
+          templateName: ''
+        },
+        id: taskID,
+      });
+    });
   }
   if(dpsInstanceID){ await dps_clean(dpsInstanceID); }
 });
@@ -180,15 +211,16 @@ btnCopyTxt.addEventListener('click', ()=>{
 
 const funcUpdateCvrSettings = async()=>{
   let tpl = await fetch(selTemplate.value).then(r=>r.text());
-  if(parseInt(selResolution.value.split(',')[0]) > 1920){
-    tpl = tpl.replace(',{"Mode":"LM_LINES"}', ''); // speed up ligh resolution
-  }
+  // if(parseInt(selResolution.value.split(',')[0]) > 1920){
+  //   tpl = tpl.replace(',{"Mode":"LM_LINES"}', ''); // speed up high resolution
+  // }
   await dps_initCVRSettings(dpsInstanceID, tpl);
 }
 const funcUpdatePanoramaSettings = async()=>{
-  let tpl = await fetch('template_panorama.json?v=20240528').then(r=>r.text());
-  if(parseInt(selResolution.value.split(',')[0]) > 1920){
-    tpl = tpl.replace('"PanoramicImageScalePercent": 50,', '"PanoramicImageScalePercent": 25,'); // speed up ligh resolution
+  let tpl = await fetch('template_panorama.json?v=20240628').then(r=>r.text());
+  if(parseInt(selResolution.value.split(',')[0]) > 2600){
+    //tpl = tpl.replace('"PanoramicImageScalePercent": 50,', '"PanoramicImageScalePercent": 25,'); // speed up high resolution
+    tpl = tpl.replace('"MemoryKeepLevel": 5,', '"MemoryKeepLevel": 3,'); // speed up high resolution
   }
   await dps_initSettings(dpsInstanceID, tpl);
 }
@@ -260,92 +292,41 @@ const dps_initSettings = async(dpsInstanceID, settings)=>{
 };
 const dps_stitchImage = async(dpsInstanceID, camera, resultCtx, videoOverlayCtx = undefined)=>{
   const frameCvs = camera.getFrame();
+
+  // kdebug: collect image
+  if(document.querySelector('#cb-upload-frame').checked){
+    try{
+      let cvs = frameCvs;
+      let fd = new FormData();
+      if (cvs != null) {
+        let blob = cvs.convertToBlob
+          ? await cvs.convertToBlob()
+          : await new Promise((resolve) => {
+            cvs.toBlob((blob) => resolve(blob));
+          });
+        fd.append("name", (new Date().toISOString().replace(/[:-]/g,'').replace(/[T\.]/g,'_'))+'-'+frameCount.toString().padStart(3, '0')+'.png');
+        fd.append("img", blob);
+        await fetch("collect", {
+          method: "POST",
+          body: fd,
+        });
+      }
+    }catch(ex){console.log(ex);}
+  }
+  // avoid send another image when stitchImage already received null(means stop)
+  // Only necessary when you need to upload frames
+  if('closed' === camera.status){return;}
+
   const u8 = frameCvs.getContext("2d").getImageData(0, 0, frameCvs.width, frameCvs.height).data;
   if(!u8.length){console.log('no image');return;}
   let taskID = Dynamsoft.Core.getNextTaskID();
   return await new Promise((rs,rj)=>{
     Dynamsoft.Core.mapTaskCallBack[taskID] = async(body) => {
 
-      // kdebug: collect image
-      if(document.querySelector('#cb-upload-frame').checked){
-        try{
-          let cvs = frameCvs;
-          let fd = new FormData();
-          if (cvs != null) {
-            let blob = cvs.convertToBlob
-              ? await cvs.convertToBlob()
-              : await new Promise((resolve) => {
-                cvs.toBlob((blob) => resolve(blob));
-              });
-            fd.append("img", blob);
-            await fetch("collect", {
-              method: "POST",
-              body: fd,
-            });
-          }
-        }catch(ex){console.log(ex);}
-      }
-
       if (body.success) {
         const ret = body.response;
-        const capturedPanorama = ret.capturedPanoramaArray[0];
-        const image = capturedPanorama.image;
-        const resultCvs = resultCtx.canvas;
-        if(capturedPanorama.errorCode){
-          console.warn(`errorCode: ${capturedPanorama.errorCode}, errorMessage: ${capturedPanorama.errorString}`);
-          let errorString = capturedPanorama.errorString;
-          if(capturedPanorama.errorCode <= -20000 && capturedPanorama.errorCode > -30000){
-            errorString = errorString || 'License Error';
-          }
-          throw(Error(errorString));
-        }
-        if(image){
-          if(resultCvs.width !== image.width){ resultCvs.width = image.width; }
-          if(resultCvs.height !== image.height){ resultCvs.height = image.height; }
-          const bgrBytes = image.bytes;
-          const rgbaBytes = new Uint8ClampedArray(image.height * image.width * 4);
-          for(let i = 0, length = image.height * image.width; i < length; ++i){
-            rgbaBytes[i*4+2] = bgrBytes[i*3];
-            rgbaBytes[i*4+1] = bgrBytes[i*3+1];
-            rgbaBytes[i*4] = bgrBytes[i*3+2];
-            rgbaBytes[i*4+3] = 255;
-          }
-          resultCtx.putImageData(new ImageData(rgbaBytes, image.width, image.height), 0, 0);
-
-          resultCtx.fillStyle = 'rgba(0,255,0,0.5)';
-          resultCtx.strokeStyle = 'rgba(0,255,0,1)';
-          resultCtx.lineWidth = 1;
-          for(let landmark of capturedPanorama.landmarksArray){
-            let p = landmark.location.points;
-            resultCtx.beginPath();
-            resultCtx.moveTo(p[0].x, p[0].y);
-            resultCtx.lineTo(p[1].x, p[1].y);
-            resultCtx.lineTo(p[2].x, p[2].y);
-            resultCtx.lineTo(p[3].x, p[3].y);
-            resultCtx.fill();
-            resultCtx.closePath();
-            resultCtx.stroke();
-          }
-        }
-
-        if(videoOverlayCtx && ret.frameMappedResult?.landmarksArray){
-          videoOverlayCtx.clearRect(0, 0, videoOverlayCtx.canvas.width, videoOverlayCtx.canvas.height);
-          videoOverlayCtx.fillStyle = 'rgba(0,255,0,0.5)';
-          videoOverlayCtx.strokeStyle = 'rgba(0,255,0,1)';
-          videoOverlayCtx.lineWidth = 1;
-          for(let landmark of ret.frameMappedResult.landmarksArray){
-            let p = landmark.location.points;
-            videoOverlayCtx.beginPath();
-            videoOverlayCtx.moveTo(p[0].x, p[0].y);
-            videoOverlayCtx.lineTo(p[1].x, p[1].y);
-            videoOverlayCtx.lineTo(p[2].x, p[2].y);
-            videoOverlayCtx.lineTo(p[3].x, p[3].y);
-            videoOverlayCtx.fill();
-            videoOverlayCtx.closePath();
-            videoOverlayCtx.stroke();
-          }
-        }
-        rs({...ret, resultCvs});
+        handleResult(ret, resultCtx, videoOverlayCtx);
+        rs({...ret, resultCvs: resultCtx.canvas});
       } else {
         const err = Error(body.message);
         if (body.stack) { err.stack = body.stack; }
@@ -404,5 +385,67 @@ const dps_deleteInstance = async(dpsInstanceID)=>{
       id: taskID,
     });
   });
+};
+const handleResult = (ret, resultCtx, videoOverlayCtx) => {
+  const capturedPanorama = ret.capturedPanoramaArray[0];
+  const image = capturedPanorama.image;
+  const resultCvs = resultCtx.canvas;
+  if(capturedPanorama.errorCode){
+    console.warn(`errorCode: ${capturedPanorama.errorCode}, errorMessage: ${capturedPanorama.errorString}`);
+    let errorString = capturedPanorama.errorString;
+    if(capturedPanorama.errorCode <= -20000 && capturedPanorama.errorCode > -30000){
+      errorString = errorString || 'License Error';
+    }
+    throw(Error(errorString));
+  }
+  
+  if(image){
+    preDebug.textContent = `${image.width}x${image.height}`;//kdebug
+    if(resultCvs.width !== image.width){ resultCvs.width = image.width; }
+    if(resultCvs.height !== image.height){ resultCvs.height = image.height; }
+    const bgrBytes = image.bytes;
+    const rgbaBytes = new Uint8ClampedArray(image.height * image.width * 4);
+    for(let i = 0, length = image.height * image.width; i < length; ++i){
+      rgbaBytes[i*4+2] = bgrBytes[i*3];
+      rgbaBytes[i*4+1] = bgrBytes[i*3+1];
+      rgbaBytes[i*4] = bgrBytes[i*3+2];
+      rgbaBytes[i*4+3] = 255;
+    }
+    resultCtx.putImageData(new ImageData(rgbaBytes, image.width, image.height), 0, 0);
+
+    resultCtx.fillStyle = 'rgba(0,255,0,0.5)';
+    resultCtx.strokeStyle = 'rgba(0,255,0,1)';
+    resultCtx.lineWidth = 1;
+    for(let landmark of capturedPanorama.landmarksArray){
+      let p = landmark.location.points;
+      resultCtx.beginPath();
+      resultCtx.moveTo(p[0].x, p[0].y);
+      resultCtx.lineTo(p[1].x, p[1].y);
+      resultCtx.lineTo(p[2].x, p[2].y);
+      resultCtx.lineTo(p[3].x, p[3].y);
+      resultCtx.fill();
+      resultCtx.closePath();
+      resultCtx.stroke();
+    }
+  }
+
+  if(videoOverlayCtx && ret.frameMappedResult?.landmarksArray){
+    videoOverlayCtx.clearRect(0, 0, videoOverlayCtx.canvas.width, videoOverlayCtx.canvas.height);
+    videoOverlayCtx.fillStyle = 'rgba(0,255,0,0.5)';
+    videoOverlayCtx.strokeStyle = 'rgba(0,255,0,1)';
+    videoOverlayCtx.lineWidth = 1;
+    for(let landmark of ret.frameMappedResult.landmarksArray){
+      let p = landmark.location.points;
+      videoOverlayCtx.beginPath();
+      videoOverlayCtx.moveTo(p[0].x, p[0].y);
+      videoOverlayCtx.lineTo(p[1].x, p[1].y);
+      videoOverlayCtx.lineTo(p[2].x, p[2].y);
+      videoOverlayCtx.lineTo(p[3].x, p[3].y);
+      videoOverlayCtx.fill();
+      videoOverlayCtx.closePath();
+      videoOverlayCtx.stroke();
+    }
+  }
+
 };
 
