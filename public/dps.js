@@ -7,6 +7,7 @@ Object.assign(camera.ui.style, {
   position: 'absolute',
   top: '0px',
   right: '0px',
+  zIndex: '-1',
 });
 document.body.append(camera.ui);
 camera.shouldCloseWhenHide = false; // don't close video when windows is hidden
@@ -26,7 +27,7 @@ const resultCtx = document.getElementById('cvs-result').getContext('2d');
 
 //Dynamsoft.Core.CoreModule._bDebug = true;
 // change assets name to disable cache
-Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-07-03/';
+Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory = 'assets_2025-07-09/';
 console.log(Dynamsoft.Core.CoreModule.engineResourcePaths.rootDirectory);
 
 let dpsInstanceID;
@@ -43,100 +44,75 @@ const pInit = (async()=>{
 
 let drawedVideoOverlay = false;
 let landmarksArray = [];
-let frameCount = 0;
-let resultImageCount = 0;
+let frameCount = 0;//kdebug
 document.getElementById('btn-start').addEventListener('click', async()=>{
+  //// This button has two functions, start or pause
+
   if('closed' === camera.status || 'paused' === camera.status){
-    // start
+    //// excute start
     await pInit;
     await camera.requestResolution(selResolution.value.split(',').map(parseInt));
     await camera.open();
-    frameCount = resultImageCount = 0;
+    frameCount = 0; //kdebug
     while('opened' === camera.status){
-      const timeStart = Date.now();
-      let ret;
+      ++frameCount; //kdebug
+
+      let stitchImageResult;
       try{
-        if(cbIndicateBarcodeOnVideo.checked){
-          ret = await dps_stitchImage(dpsInstanceID, camera, resultCtx, videoOverlayCtx);
-          drawedVideoOverlay = true;
-          // double check
-          if(!cbIndicateBarcodeOnVideo.checked || 'opened' !== camera.status && 'paused' !== camera.status){
-            videoOverlayCtx.clearRect(0, 0, videoOverlayCtx.canvas.width, videoOverlayCtx.canvas.height);
-            drawedVideoOverlay = false;
-          }
-        }else{
-          ret = await dps_stitchImage(dpsInstanceID, camera, resultCtx);
-        }
+        stitchImageResult = await dps_stitchImage(dpsInstanceID, camera);
       }catch(ex){
         console.log(ex);
         alert('Looks like there is an error, you need to refresh the page. Details: '+ex?.message);
         throw ex;
       }
 
-      ++frameCount;
-      const capturedPanorama = ret?.capturedPanoramaArray?.[0];
-      if(capturedPanorama?.landmarksArray){
-        landmarksArray = capturedPanorama.landmarksArray;
-        spBarcodeCount.innerText = landmarksArray.length;
-        ++resultImageCount;
+      drawResultCanvas(stitchImageResult, resultCtx);
+
+      if(cbIndicateBarcodeOnVideo.checked && ('opened' === camera.status || 'paused' === camera.status)){
+        drawVideoOverlay(stitchImageResult, videoOverlayCtx);
+        drawedVideoOverlay = true;
       }
-      // kDebug
-      const rsl = camera.currentResolution;
-      preDebug.textContent = [
-        `${rsl.width}x${rsl.height}`,
-        `${frameCount} frame(s)`,
-        `${resultImageCount} result image(s)`,
-        `algorithm ${ret?.timeCost}ms`,
-        `total ${Date.now() - timeStart}ms`,
-        `memory ${(ret?.memory/1024/1024).toFixed(1)}MB`
-      ].join('\n');
+
+      let _landmarksArray = stitchImageResult?.capturedPanoramaArray?.[0]?.landmarksArray;
+      if(_landmarksArray){
+        landmarksArray = _landmarksArray;
+        spBarcodeCount.innerText = landmarksArray.length;
+      }
       
       if(cbSavePower.checked){ await new Promise(r=>setTimeout(r, 100)); }
     }
+
   }else if('opened' === camera.status){
-    // pause
+    //// excute pause
     camera.pause();
-  }//else opening or closing, do nothing
+    // Camera becomes 'paused' from 'opened'
+    // So stitchImage for milestone
+    let stitchImageResult = await dps_stitchImage4Milestone(dpsInstanceID);
+    drawResultCanvas(stitchImageResult, resultCtx);
+
+  }//// else opening or closing, do nothing
+});
+
+document.getElementById('btn-reset').addEventListener('click', async()=>{
+  if(!dpsInstanceID){ return; }
+  await dps_clean(dpsInstanceID);
 });
 
 document.getElementById('btn-stop').addEventListener('click', async()=>{
+  if(!dpsInstanceID){ return; }
+
   camera.close();
   if(drawedVideoOverlay){
     videoOverlayCtx.clearRect(0, 0, videoOverlayCtx.canvas.width, videoOverlayCtx.canvas.height);
     drawedVideoOverlay = false;
   }
-  // TODO: double click protection
-  if(frameCount > 2){
-    let taskID = Dynamsoft.Core.getNextTaskID();
-    return await new Promise((rs,rj)=>{
-      Dynamsoft.Core.mapTaskCallBack[taskID] = async(body) => {
 
-        if (body.success) {
-          const ret = body.response;
-          handleResult(ret, resultCtx, videoOverlayCtx);
-          rs();
-        } else {
-          const err = Error(body.message);
-          if (body.stack) { err.stack = body.stack; }
-          rj(err);
-        }
-      }
-      Dynamsoft.Core.worker.postMessage({
-        type: 'dps_setPanoramicBaseImage',
-        instanceID: dpsInstanceID,
-        body: {
-          bytes: new Uint8Array(0),
-          width: 0,
-          height: 0,
-          stride: 0,
-          format: 10,
-          templateName: ''
-        },
-        id: taskID,
-      });
-    });
-  }
-  if(dpsInstanceID){ await dps_clean(dpsInstanceID); }
+  // Camera becomes 'closed' from 'opened'
+  // So stitchImage for milestone
+  let stitchImageResult = await dps_stitchImage4Milestone(dpsInstanceID);
+  drawResultCanvas(stitchImageResult, resultCtx);
+
+  await dps_clean(dpsInstanceID);
 });
 
 document.getElementById('btn-save').addEventListener('click', async()=>{
@@ -173,7 +149,6 @@ cbMoreVideoArea.addEventListener('change', ()=>{
     Object.assign(camera.ui.style, {
       width: '100%',
       height: '70%',
-      zIndex: '-1',
     });
     divConfig.style.height = '70svh';
     resultCtx.canvas.style.height = '25svh';
@@ -181,7 +156,6 @@ cbMoreVideoArea.addEventListener('change', ()=>{
     Object.assign(camera.ui.style, {
       width: '50%',
       height: '45%',
-      zIndex: undefined,
     });
     divConfig.style.height = '45svh';
     resultCtx.canvas.style.height = '50svh';
@@ -207,7 +181,7 @@ btnCopyTxt.addEventListener('click', ()=>{
 
 
 
-// Helper code. You don't need to care about the following implementation details.
+// Helper code. SDK users don't need to care about the following implementation details.
 
 const funcUpdateCvrSettings = async()=>{
   let tpl = await fetch(selTemplate.value).then(r=>r.text());
@@ -290,7 +264,9 @@ const dps_initSettings = async(dpsInstanceID, settings)=>{
     });
   });
 };
-const dps_stitchImage = async(dpsInstanceID, camera, resultCtx, videoOverlayCtx = undefined)=>{
+const dps_stitchImage = async(dpsInstanceID, camera)=>{
+  const timeStart = Date.now();// kDebug
+
   const frameCvs = camera.getFrame();
 
   // kdebug: collect image
@@ -312,21 +288,19 @@ const dps_stitchImage = async(dpsInstanceID, camera, resultCtx, videoOverlayCtx 
         });
       }
     }catch(ex){console.log(ex);}
+
+    // avoid send another image when stop or pause is called
+    // Only necessary when you need to upload frames (because upload is async)
+    if('closed' === camera.status || 'paused' === camera.status){return;}
   }
-  // avoid send another image when stitchImage already received null(means stop)
-  // Only necessary when you need to upload frames
-  if('closed' === camera.status){return;}
 
   const u8 = frameCvs.getContext("2d").getImageData(0, 0, frameCvs.width, frameCvs.height).data;
   if(!u8.length){console.log('no image');return;}
   let taskID = Dynamsoft.Core.getNextTaskID();
-  return await new Promise((rs,rj)=>{
+  let stitchImageResult = await new Promise((rs,rj)=>{
     Dynamsoft.Core.mapTaskCallBack[taskID] = async(body) => {
-
       if (body.success) {
-        const ret = body.response;
-        handleResult(ret, resultCtx, videoOverlayCtx);
-        rs({...ret, resultCvs: resultCtx.canvas});
+        rs(body.response);
       } else {
         const err = Error(body.message);
         if (body.stack) { err.stack = body.stack; }
@@ -347,6 +321,72 @@ const dps_stitchImage = async(dpsInstanceID, camera, resultCtx, videoOverlayCtx 
       id: taskID,
     });
   });
+
+  checkStitchImageResultError(stitchImageResult);
+
+  // kDebug
+  {
+    const rsl = camera.currentResolution;
+    const image = stitchImageResult?.capturedPanoramaArray?.[0]?.image;
+    preDebug.textContent = [
+      `${rsl.width}x${rsl.height}`,
+      `${image?.width}x${image?.height}`,
+      `${frameCount} frame(s)`,
+      `algorithm ${stitchImageResult?.timeCost}ms`,
+      `total ${Date.now() - timeStart}ms`,
+      `memory ${(stitchImageResult?.memory/1024/1024).toFixed(1)}MB`
+    ].join('\n');
+  }
+
+  return stitchImageResult;
+};
+// stitchImage for milestone, completely stitch images which were originally intended for future
+const dps_stitchImage4Milestone = async(dpsInstanceID)=>{
+  const timeStart = Date.now();// kDebug
+
+  let taskID = Dynamsoft.Core.getNextTaskID();
+  let stitchImageResult = await new Promise((rs,rj)=>{
+    Dynamsoft.Core.mapTaskCallBack[taskID] = async(body) => {
+      if (body.success) {
+        rs(body.response);
+      } else {
+        const err = Error(body.message);
+        if (body.stack) { err.stack = body.stack; }
+        rj(err);
+      }
+    }
+    Dynamsoft.Core.worker.postMessage({
+      type: 'dps_setPanoramicBaseImage',
+      instanceID: dpsInstanceID,
+      body: {
+        bytes: null,
+        width: 0,
+        height: 0,
+        stride: 0,
+        format: 0,
+        templateName: ''
+      },
+      id: taskID,
+    });
+  });
+
+  checkStitchImageResultError(stitchImageResult);
+
+  // kDebug
+  {
+    const rsl = camera.currentResolution;
+    const image = stitchImageResult?.capturedPanoramaArray?.[0]?.image;
+    preDebug.textContent = [
+      `${rsl.width}x${rsl.height}`,
+      `${image?.width}x${image?.height}`,
+      `${frameCount} frame(s)`,
+      `algorithm ${stitchImageResult?.timeCost}ms`,
+      `total ${Date.now() - timeStart}ms`,
+      `memory ${(stitchImageResult?.memory/1024/1024).toFixed(1)}MB`
+    ].join('\n');
+  }
+
+  return stitchImageResult;
 };
 const dps_clean = async(dpsInstanceID)=>{
   let taskID = Dynamsoft.Core.getNextTaskID();
@@ -386,21 +426,23 @@ const dps_deleteInstance = async(dpsInstanceID)=>{
     });
   });
 };
-const handleResult = (ret, resultCtx, videoOverlayCtx) => {
-  const capturedPanorama = ret.capturedPanoramaArray[0];
-  const image = capturedPanorama.image;
-  const resultCvs = resultCtx.canvas;
+const checkStitchImageResultError = (stitchImageResult) => { 
+  const capturedPanorama = stitchImageResult.capturedPanoramaArray[0];
   if(capturedPanorama.errorCode){
     console.warn(`errorCode: ${capturedPanorama.errorCode}, errorMessage: ${capturedPanorama.errorString}`);
     let errorString = capturedPanorama.errorString;
     if(capturedPanorama.errorCode <= -20000 && capturedPanorama.errorCode > -30000){
       errorString = errorString || 'License Error';
     }
-    throw(Error(errorString));
+    throw Error(errorString);
   }
-  
-  if(image){
-    preDebug.textContent = `${image.width}x${image.height}`;//kdebug
+};
+const drawResultCanvas = (stitchImageResult, resultCtx)=>{
+  const capturedPanorama = stitchImageResult?.capturedPanoramaArray?.[0];
+  const image = capturedPanorama?.image;
+  const resultCvs = resultCtx?.canvas;
+
+  if(image && resultCvs){
     if(resultCvs.width !== image.width){ resultCvs.width = image.width; }
     if(resultCvs.height !== image.height){ resultCvs.height = image.height; }
     const bgrBytes = image.bytes;
@@ -428,13 +470,16 @@ const handleResult = (ret, resultCtx, videoOverlayCtx) => {
       resultCtx.stroke();
     }
   }
-
-  if(videoOverlayCtx && ret.frameMappedResult?.landmarksArray){
+};
+const drawVideoOverlay = (stitchImageResult, videoOverlayCtx) => {
+  const landmarksArray = stitchImageResult?.frameMappedResult?.landmarksArray;
+  
+  if(videoOverlayCtx && landmarksArray){
     videoOverlayCtx.clearRect(0, 0, videoOverlayCtx.canvas.width, videoOverlayCtx.canvas.height);
     videoOverlayCtx.fillStyle = 'rgba(0,255,0,0.5)';
     videoOverlayCtx.strokeStyle = 'rgba(0,255,0,1)';
     videoOverlayCtx.lineWidth = 1;
-    for(let landmark of ret.frameMappedResult.landmarksArray){
+    for(let landmark of landmarksArray){
       let p = landmark.location.points;
       videoOverlayCtx.beginPath();
       videoOverlayCtx.moveTo(p[0].x, p[0].y);
@@ -446,6 +491,5 @@ const handleResult = (ret, resultCtx, videoOverlayCtx) => {
       videoOverlayCtx.stroke();
     }
   }
-
 };
 
