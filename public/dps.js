@@ -19,7 +19,6 @@ const cbSavePower = document.getElementById('cb-savepower');
 const selResolution = document.getElementById('sel-resolution');
 const selTemplate = document.getElementById('sel-template');
 const spBarcodeCount = document.getElementById('sp-barcode-count');
-const btnCopyTxt = document.getElementById('btn-copy-txt');
 const preDebug = document.getElementById('pre-debug');
 
 const videoOverlayCtx = camera.addCanvas().getContext('2d');
@@ -50,6 +49,10 @@ document.getElementById('btn-start').addEventListener('click', async()=>{
 
   if('closed' === camera.status || 'paused' === camera.status){
     //// excute start
+    if('closed' === camera.status){
+      // clear old result canvas if exists
+      resultCtx.canvas.width = resultCtx.canvas.height = 0;
+    }
     await pInit;
     await camera.requestResolution(selResolution.value.split(',').map(parseInt));
     await camera.open();
@@ -95,9 +98,21 @@ document.getElementById('btn-start').addEventListener('click', async()=>{
 
 document.getElementById('btn-reset').addEventListener('click', async()=>{
   if(!dpsInstanceID){ return; }
+
+  // hide current and subsequent results during `dps_clean`
+  resultCtx.canvas.style.visibility = 'hidden';
+
   await dps_clean(dpsInstanceID);
+
+  // clear old result canvas
+  resultCtx.canvas.width = resultCtx.canvas.height = 0;
+  // and ready for subsequent results
+  resultCtx.canvas.style.visibility = '';
 });
 
+// `stop`, `saveImage` and `copyTxt`,
+// they are usually a group of linked operations,
+// can be combined into one button. 
 document.getElementById('btn-stop').addEventListener('click', async()=>{
   if(!dpsInstanceID){ return; }
 
@@ -114,7 +129,6 @@ document.getElementById('btn-stop').addEventListener('click', async()=>{
 
   await dps_clean(dpsInstanceID);
 });
-
 document.getElementById('btn-save').addEventListener('click', async()=>{
   const blob = await new Promise(rs=>{
     resultCtx.canvas.toBlob(rs);
@@ -135,6 +149,9 @@ document.getElementById('btn-save').addEventListener('click', async()=>{
   );
   document.body.removeChild(link);
   
+});
+document.getElementById('btn-copy-txt').addEventListener('click', ()=>{
+  navigator.clipboard.writeText(landmarksArray.map(l=>l.text).join('\n'));
 });
 
 cbIndicateBarcodeOnVideo.addEventListener('change', ()=>{
@@ -172,10 +189,6 @@ selTemplate.addEventListener('change', async()=>{
   await pInit;
   await funcUpdateCvrSettings();
 })
-
-btnCopyTxt.addEventListener('click', ()=>{
-  navigator.clipboard.writeText(landmarksArray.map(l=>l.text).join('\n'));
-});
 
 
 
