@@ -221,6 +221,9 @@ selBarcodeColor.addEventListener('change', async()=>{
 // For dynamsoft TST and developer, currently our templates are based on dbr10, please do not use dbr11 templates.
 const funcUpdateCvrSettings = async()=>{
   let tpl = await fetch('template_cvr.json?v=20250711').then(r=>r.text());
+
+  
+  //// If you have customized the template, please consider removing if/else code
   if('speed' === selSpeedCoverage.value){
     tpl = tpl
       .replace(/,\s*{\s*"Mode"\s*:\s*"LM_LINES"\s*}/, '')
@@ -245,11 +248,16 @@ const funcUpdateCvrSettings = async()=>{
     tpl = tpl
       .replace(/{\s*"Mode"\s*:\s*"GTM_ORIGINAL"\s*}\s*,/, '');
   }
+
+
   //console.log(tpl);//kdebug
   await dps_initCVRSettings(dpsInstanceID, tpl);
 }
 const funcUpdatePanoramaSettings = async()=>{
   let tpl = await fetch('template_panorama.json?v=20240628').then(r=>r.text());
+
+
+  //// If you have customized the template, please consider removing if/else code
   if('speed' === selSpeedCoverage.value){
     tpl = tpl
       .replace(/"MemoryKeepLevel"\s*:\s*[0-9]*/, '"MemoryKeepLevel" : 3');
@@ -261,6 +269,8 @@ const funcUpdatePanoramaSettings = async()=>{
     tpl = tpl
       .replace(/,\s*"BarcodeFormatIds"\s*:\s*\[\s*"BF_ALL"\s*\]/, ',"BarcodeFormatIds":["BF_MICRO_PDF417","BF_PDF417","BF_QR_CODE","BF_DATAMATRIX","BF_AZTEC","BF_MICRO_QR"]');
   }
+
+
   //console.log(tpl);//kdebug
   await dps_initSettings(dpsInstanceID, tpl);
 }
