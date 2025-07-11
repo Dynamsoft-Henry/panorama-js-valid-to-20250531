@@ -17,7 +17,7 @@ const cbIndicateBarcodeOnVideo = document.getElementById('cb-indicate-barcode-on
 const cbMoreVideoArea = document.getElementById('cb-more-video-area');
 const cbSavePower = document.getElementById('cb-savepower');
 const selResolution = document.getElementById('sel-resolution');
-const selTemplate = document.getElementById('sel-template');
+
 const spBarcodeCount = document.getElementById('sp-barcode-count');
 const preDebug = document.getElementById('pre-debug');
 
@@ -181,14 +181,15 @@ cbMoreVideoArea.addEventListener('change', ()=>{
 
 selResolution.addEventListener('change', async()=>{
   await camera.requestResolution(selResolution.value.split(',').map(parseInt));
-  await funcUpdateCvrSettings();
-  await funcUpdatePanoramaSettings();
-})
+});
+document.getElementById('btn-troch', ()=>{
+  if(camera.isTorchOn){
+    camera.turnOffTorch();
+  }else{
+    camera.turnOnTorch();
+  }
+});
 
-selTemplate.addEventListener('change', async()=>{
-  await pInit;
-  await funcUpdateCvrSettings();
-})
 
 
 
@@ -196,19 +197,71 @@ selTemplate.addEventListener('change', async()=>{
 
 // Helper code. SDK users don't need to care about the following implementation details.
 
+
+
+const selSpeedCoverage = document.getElementById('sel-speed-coverage');
+const selBarcodeFormat = document.getElementById('sel-barcode-format');
+const selBarcodeColor = document.getElementById('sel-barcode-color');
+
+selSpeedCoverage.addEventListener('change', async()=>{
+  await pInit;
+  await funcUpdateCvrSettings();
+  await funcUpdatePanoramaSettings();
+});
+selBarcodeFormat.addEventListener('change', async()=>{
+  await pInit;
+  await funcUpdateCvrSettings();
+  await funcUpdatePanoramaSettings();
+});
+selBarcodeColor.addEventListener('change', async()=>{
+  await pInit;
+  await funcUpdateCvrSettings();
+});
+
+// For dynamsoft TST and developer, currently our templates are based on dbr10, please do not use dbr11 templates.
 const funcUpdateCvrSettings = async()=>{
-  let tpl = await fetch(selTemplate.value).then(r=>r.text());
-  // if(parseInt(selResolution.value.split(',')[0]) > 1920){
-  //   tpl = tpl.replace(',{"Mode":"LM_LINES"}', ''); // speed up high resolution
-  // }
+  let tpl = await fetch('template_cvr.json?v=20250711').then(r=>r.text());
+  if('speed' === selSpeedCoverage.value){
+    tpl = tpl
+      .replace(/,\s*{\s*"Mode"\s*:\s*"LM_LINES"\s*}/, '')
+      .replace(/,\s*{\s*"Mode"\s*:\s*"DM_THRESHOLD_BINARIZATION"\s*}/, '')
+      .replace(/,\s*{\s*"Mode"\s*:\s*"DM_DIRECT_BINARIZATION"\s*}/, '')
+      .replace(/,\s*{\s*"Mode"\s*:\s*"DM_DEEP_ANALYSIS"\s*}/, '');
+  }else if('balance' === selSpeedCoverage.value){
+    tpl = tpl
+      .replace(/,\s*{\s*"Mode"\s*:\s*"DM_DEEP_ANALYSIS"\s*}/, '');
+  }
+  if('1D' === selBarcodeFormat.value){
+    tpl = tpl
+      .replace(/,\s*"BarcodeFormatIds"\s*:\s*\[\s*"BF_ALL"\s*\]/, ',"BarcodeFormatIds":["BF_ONED"]');
+  }else if('2D' === selBarcodeFormat.value){
+    tpl = tpl
+      .replace(/,\s*"BarcodeFormatIds"\s*:\s*\[\s*"BF_ALL"\s*\]/, ',"BarcodeFormatIds":["BF_MICRO_PDF417","BF_PDF417","BF_QR_CODE","BF_DATAMATRIX","BF_AZTEC","BF_MICRO_QR"]');
+  }
+  if('normal' === selBarcodeColor.value){
+    tpl = tpl
+      .replace(/,\s*{\s*"Mode"\s*:\s*"GTM_INVERTED"\s*}\s*/, '');
+  }else if('inverted' === selBarcodeColor.value){
+    tpl = tpl
+      .replace(/{\s*"Mode"\s*:\s*"GTM_ORIGINAL"\s*}\s*,/, '');
+  }
+  //console.log(tpl);//kdebug
   await dps_initCVRSettings(dpsInstanceID, tpl);
 }
 const funcUpdatePanoramaSettings = async()=>{
   let tpl = await fetch('template_panorama.json?v=20240628').then(r=>r.text());
-  if(parseInt(selResolution.value.split(',')[0]) > 2600){
-    //tpl = tpl.replace('"PanoramicImageScalePercent": 50,', '"PanoramicImageScalePercent": 25,'); // speed up high resolution
-    tpl = tpl.replace('"MemoryKeepLevel": 5,', '"MemoryKeepLevel": 3,'); // speed up high resolution
+  if('speed' === selSpeedCoverage.value){
+    tpl = tpl
+      .replace(/"MemoryKeepLevel"\s*:\s*[0-9]*/, '"MemoryKeepLevel" : 3');
   }
+  if('1D' === selBarcodeFormat.value){
+    tpl = tpl
+      .replace(/,\s*"BarcodeFormatIds"\s*:\s*\[\s*"BF_ALL"\s*\]/, ',"BarcodeFormatIds":["BF_ONED"]');
+  }else if('2D' === selBarcodeFormat.value){
+    tpl = tpl
+      .replace(/,\s*"BarcodeFormatIds"\s*:\s*\[\s*"BF_ALL"\s*\]/, ',"BarcodeFormatIds":["BF_MICRO_PDF417","BF_PDF417","BF_QR_CODE","BF_DATAMATRIX","BF_AZTEC","BF_MICRO_QR"]');
+  }
+  //console.log(tpl);//kdebug
   await dps_initSettings(dpsInstanceID, tpl);
 }
 const dps_createInstance = async()=>{

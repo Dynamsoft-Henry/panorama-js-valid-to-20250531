@@ -1,9 +1,53 @@
 {
-  "BatchScanTemplates": [
-    {
-      "Name": "BST_Default",
-      "MemoryKeepLevel": 5,
-      "CaptureVisionTemplateName": "CVT_Default"
-    }
-  ]
+	"BatchScanTemplates" : 
+	[
+		{
+			"ARCorrectionLevel" : 4,
+			"AutoStopOption" : 
+			{
+				"AutoStopMode" : null,
+				"CheckFramesCount" : 8
+			},
+			"BarcodeFormatIds" : 
+			[
+				"BF_ALL"
+			],
+			"BarcodesOneLineStatus" : 0,
+			"CaptureVisionTemplateName" : "",
+			"DuplicationCorrectionOption" : 
+			{
+				"DuplicateBarcodeInterval" : 4,
+				"HasDuplicateBarcodes" : 1
+			},
+			"EnableDrawLandmarks" : 0,
+			"EnableOutputFrameMappedResult" : 1,
+			"EnableOutputPreviewPanorama" : 1,
+			"EnableOutputResultImage" : 1,
+			"MaxMemorySize" : 1024,
+			"MaxOverlappingFrames" : -1,
+			"MemoryKeepLevel" : 5,
+			"MinLocalizedBarcodeConfidence" : 100,
+			"Name" : "default",
+			"OutputLandmarkType" : 
+			[
+				"LT_BARCODE"
+			],
+			"PanoramaTileSavePath" : "",
+			"PanoramaTileSize" : 2147483647,
+			"PanoramicImageScalePercent" : 0,
+			"PerspectiveLevel" : 5,
+			"PlaneDirection" : 2,
+			"PreviewImageOption" : 
+			{
+				"MaxVisibleLength" : 0,
+				"ScaleRatio" : 20
+			},
+			"SectionLayoutOptions" : null,
+			"StitchLevel" : 0,
+			"StitchMode" : 0,
+			"ThreadManagementMode" : 1,
+			"UniqueBarcodeFormatIds" : null,
+			"VistaCombineMode" : 0
+		}
+	]
 }

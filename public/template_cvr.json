@@ -22,11 +22,18 @@
   "BarcodeReaderTaskSettingOptions": [
     {
       "Name": "BR_0",
+      "BarcodeFormatIds": 
+      [
+        "BF_ALL"
+      ],
       "ExpectedBarcodesCount": 9999,
       "LocalizationModes": [
         {
           "Mode": "LM_CONNECTED_BLOCKS"
-        },{"Mode":"LM_LINES"}
+        },
+        {
+          "Mode": "LM_LINES"
+        }
       ],
       "DeblurModes": [
         {
@@ -62,6 +69,14 @@
   "ImageParameterOptions": [
     {
       "Name": "IP_0",
+      "GrayscaleTransformationModes": [
+        {
+          "Mode": "GTM_ORIGINAL"
+        },
+        {
+          "Mode": "GTM_INVERTED"
+        }
+      ],
       "BinarizationModes": [
         {
           "Mode": "BM_LOCAL_BLOCK",
