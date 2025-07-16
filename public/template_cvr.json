@@ -62,9 +62,6 @@
       "GrayscaleTransformationModes": [
         {
           "Mode": "GTM_ORIGINAL"
-        },
-        {
-          "Mode": "GTM_INVERTED"
         }
       ],
       "BinarizationModes": [
