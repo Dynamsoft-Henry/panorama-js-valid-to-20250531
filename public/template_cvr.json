@@ -25,7 +25,7 @@
       [
         "BF_ALL"
       ],
-      "ExpectedBarcodesCount": 9999,
+      "ExpectedBarcodesCount": 0,
       "LocalizationModes": [
         {
           "Mode": "LM_CONNECTED_BLOCKS"
