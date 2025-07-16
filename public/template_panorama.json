@@ -22,7 +22,7 @@
 			"EnableDrawLandmarks" : 0,
 			"EnableOutputFrameMappedResult" : 1,
 			"EnableOutputPreviewPanorama" : 1,
-			"EnableOutputResultImage" : 1,
+			"EnableOutputResultImage" : 0,
 			"MaxMemorySize" : 1024,
 			"MaxOverlappingFrames" : -1,
 			"MemoryKeepLevel" : 5,
